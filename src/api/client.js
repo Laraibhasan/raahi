@@ -1,7 +1,15 @@
 import axios from 'axios'
 
+// Empty string = relative URLs (correct for production)
+// Localhost = for local dev
+const BASE = import.meta.env.VITE_API_URL !== undefined && import.meta.env.VITE_API_URL !== ''
+  ? import.meta.env.VITE_API_URL
+  : import.meta.env.DEV
+    ? 'http://localhost:8000'
+    : ''
+
 const client = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8000',
+  baseURL: BASE,
   timeout: 60000,
 })
 
@@ -10,22 +18,20 @@ export const generateItineraryStream = (formData, onChunk, onComplete, onError) 
     (new Date(formData.endDate) - new Date(formData.startDate)) / 86400000
   ))
 
-  const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
-
-  fetch(`${baseURL}/api/generate-itinerary-stream`, {
-    method:  'POST',
+  fetch(`${BASE}/api/generate-itinerary-stream`, {
+    method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body:    JSON.stringify({ ...formData, days }),
+    body: JSON.stringify({ ...formData, days }),
   })
     .then(async (res) => {
-      const reader  = res.body.getReader()
+      const reader = res.body.getReader()
       const decoder = new TextDecoder()
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
-        const text  = decoder.decode(value)
+        const text = decoder.decode(value)
         const lines = text.split('\n').filter(l => l.startsWith('data: '))
 
         for (const line of lines) {
@@ -34,9 +40,9 @@ export const generateItineraryStream = (formData, onChunk, onComplete, onError) 
 
           try {
             const parsed = JSON.parse(raw)
-            if (parsed.error)  { onError(parsed.error); return }
-            if (parsed.final)  { onComplete(parsed.final); return }
-            if (parsed.chunk)  { onChunk(parsed.chunk) }
+            if (parsed.error) { onError(parsed.error); return }
+            if (parsed.final) { onComplete(parsed.final); return }
+            if (parsed.chunk) { onChunk(parsed.chunk) }
           } catch {}
         }
       }
