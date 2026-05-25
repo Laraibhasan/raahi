@@ -1,5 +1,6 @@
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from mangum import Mangum
 from dotenv import load_dotenv
 from pydantic import BaseModel
@@ -11,49 +12,44 @@ from slowapi.errors import RateLimitExceeded
 from bson import ObjectId
 import os, json, datetime, hashlib
 import certifi
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import StreamingResponse
 
 load_dotenv()
 
 # ── Rate limiter ──
 limiter = Limiter(key_func=get_remote_address)
-
-app = FastAPI(title="Raahi API", version="1.0.0")
+app     = FastAPI(title="Raahi API", version="1.0.0")
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "https://raahiapp.vercel.app"],
+    allow_origins=[
+        "http://localhost:5173",
+        "http://localhost:4173",
+        "https://raahiapp.vercel.app",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ── MongoDB ──
-mongo_client = None
-db           = None
+# ── MongoDB — lazy init (works in serverless) ──
+_mongo_client = None
+_db           = None
 
-@app.on_event("startup")
-async def startup_db():
-    global mongo_client, db
-    uri = os.getenv("MONGODB_URI")
-    if uri:
-        mongo_client = AsyncIOMotorClient(
-            uri,
-            tlsCAFile=certifi.where(),
-            tlsInsecure=True
-        )
-        db = mongo_client.raahi
-        print("✅ MongoDB connected")
-    else:
-        print("⚠️  MONGODB_URI not set")
-
-@app.on_event("shutdown")
-async def shutdown_db():
-    if mongo_client:
-        mongo_client.close()
+def get_db():
+    global _mongo_client, _db
+    if _db is None:
+        uri = os.getenv("MONGODB_URI")
+        if uri:
+            _mongo_client = AsyncIOMotorClient(
+                uri,
+                tlsCAFile=certifi.where(),
+                tlsInsecure=True,
+                serverSelectionTimeoutMS=5000,
+            )
+            _db = _mongo_client.raahi
+    return _db
 
 # ── Redis ──
 def get_redis():
@@ -61,7 +57,7 @@ def get_redis():
         from upstash_redis import Redis
         return Redis(
             url=os.getenv("UPSTASH_REDIS_REST_URL"),
-            token=os.getenv("UPSTASH_REDIS_REST_TOKEN")
+            token=os.getenv("UPSTASH_REDIS_REST_TOKEN"),
         )
     except Exception:
         return None
@@ -171,285 +167,6 @@ Return ONLY a raw JSON object — no markdown, no backticks, no extra text. Sche
 }}
 """
 
-# ── Models ──
-class TripRequest(BaseModel):
-    destination: str
-    startDate:   str
-    endDate:     str
-    travellers:  int
-    tripType:    str
-    budget:      str
-    interests:   List[str]
-    days:        int
-
-class SaveTripRequest(BaseModel):
-    user_id:     str
-    destination: str
-    form:        dict
-    itinerary:   dict
-
-class ChatMessage(BaseModel):
-    role:    str
-    content: str
-
-class ChatRequest(BaseModel):
-    messages:     List[ChatMessage]
-    trip_context: dict
-
-# ── Routes ──
-@app.get("/api/health")
-async def health():
-    redis = get_redis()
-    return {
-        "status":  "ok",
-        "message": "Raahi API running 🇮🇳",
-        "cache":   "connected" if redis else "unavailable"
-    }
-
-@app.post("/api/generate-itinerary-stream")
-@limiter.limit("5/minute")
-async def generate_itinerary_stream(request: Request, trip: TripRequest):
-    # Check cache first — if hit, stream the cached result instantly
-    redis     = get_redis()
-    cache_key = make_cache_key(trip)
-
-    if redis:
-        try:
-            cached = redis.get(cache_key)
-            if cached:
-                print(f"✅ Stream cache HIT: {cache_key}")
-                async def stream_cached():
-                    yield f"data: {cached}\n\n"
-                    yield "data: [DONE]\n\n"
-                return StreamingResponse(
-                    stream_cached(),
-                    media_type="text/event-stream",
-                    headers={"Cache-Control": "no-cache", "X-From-Cache": "true"}
-                )
-        except Exception as e:
-            print(f"⚠️  Redis read error: {e}")
-
-    async def generate():
-        try:
-            from langchain_groq import ChatGroq
-            from langchain_core.prompts import ChatPromptTemplate
-
-            llm   = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.7,
-                             max_tokens=4096, api_key=os.getenv("GROQ_API_KEY"),
-                             streaming=True)
-            prompt = ChatPromptTemplate.from_template(PROMPT)
-            chain  = prompt | llm
-
-            full_response = ""
-
-            async for chunk in chain.astream({
-                "destination": trip.destination,
-                "days":        trip.days,
-                "startDate":   trip.startDate,
-                "endDate":     trip.endDate,
-                "travellers":  trip.travellers,
-                "tripType":    trip.tripType,
-                "budget":      BUDGET_MAP.get(trip.budget, trip.budget),
-                "interests":   ", ".join(trip.interests),
-            }):
-                text = chunk.content if hasattr(chunk, 'content') else str(chunk)
-                if text:
-                    full_response += text
-                    # stream each chunk to frontend
-                    yield f"data: {json.dumps({'chunk': text})}\n\n"
-
-            # clean and parse the complete response
-            raw = full_response.strip()
-            if raw.startswith("```"):
-                raw = raw.split("```")[1]
-                if raw.startswith("json"): raw = raw[4:]
-            raw = raw.strip()
-            start = raw.find('{'); end = raw.rfind('}')
-            if start != -1 and end != -1: raw = raw[start:end+1]
-
-            try:
-                result = json.loads(raw)
-            except json.JSONDecodeError:
-                from json_repair import repair_json
-                result = json.loads(repair_json(raw))
-
-            # cache the final parsed result
-            if redis:
-                try:
-                    redis.setex(cache_key, 604800, json.dumps(result))
-                    print(f"✅ Cached streamed result: {cache_key}")
-                except Exception as e:
-                    print(f"⚠️  Redis write error: {e}")
-
-            # send the final parsed JSON
-            yield f"data: {json.dumps({'final': result})}\n\n"
-            yield "data: [DONE]\n\n"
-
-        except Exception as e:
-            import traceback; traceback.print_exc()
-            yield f"data: {json.dumps({'error': str(e)})}\n\n"
-            yield "data: [DONE]\n\n"
-
-    return StreamingResponse(
-        generate(),
-        media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache"}
-    )
-
-@app.post("/api/generate-itinerary")
-@limiter.limit("5/minute")
-async def generate_itinerary(request: Request, trip: TripRequest):
-    # ── Check cache first ──
-    redis      = get_redis()
-    cache_key  = make_cache_key(trip)
-
-    if redis:
-        try:
-            cached = redis.get(cache_key)
-            if cached:
-                print(f"✅ Cache HIT: {cache_key}")
-                return {"success": True, "data": json.loads(cached), "from_cache": True}
-        except Exception as e:
-            print(f"⚠️  Redis read error: {e}")
-
-    print(f"🔄 Cache MISS — generating for {trip.destination}")
-
-    # ── Generate with AI ──
-    try:
-        from langchain_groq import ChatGroq
-        from langchain_core.prompts import ChatPromptTemplate
-        from langchain_core.output_parsers import StrOutputParser
-
-        llm   = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.7,
-                         max_tokens=4096, api_key=os.getenv("GROQ_API_KEY"))
-        chain = ChatPromptTemplate.from_template(PROMPT) | llm | StrOutputParser()
-
-        raw = await chain.ainvoke({
-            "destination": trip.destination,
-            "days":        trip.days,
-            "startDate":   trip.startDate,
-            "endDate":     trip.endDate,
-            "travellers":  trip.travellers,
-            "tripType":    trip.tripType,
-            "budget":      BUDGET_MAP.get(trip.budget, trip.budget),
-            "interests":   ", ".join(trip.interests),
-        })
-
-        raw = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        raw = raw.strip()
-
-        start = raw.find('{')
-        end   = raw.rfind('}')
-        if start != -1 and end != -1:
-            raw = raw[start:end+1]
-
-        result = json.loads(raw)
-
-        # ── Store in cache for 7 days ──
-        if redis:
-            try:
-                redis.setex(cache_key, 604800, json.dumps(result))
-                print(f"✅ Cached: {cache_key}")
-            except Exception as e:
-                print(f"⚠️  Redis write error: {e}")
-
-        return {"success": True, "data": result, "from_cache": False}
-
-    except json.JSONDecodeError as e:
-        try:
-            from json_repair import repair_json
-            fixed = repair_json(raw)
-            return {"success": True, "data": json.loads(fixed), "from_cache": False}
-        except Exception:
-            import traceback; traceback.print_exc()
-            raise HTTPException(500, f"AI returned invalid JSON: {e}")
-    except Exception as e:
-        import traceback; traceback.print_exc()
-        raise HTTPException(500, str(e))
-
-@app.post("/api/trips")
-async def save_trip(data: SaveTripRequest):
-    if db is None:
-        raise HTTPException(500, "Database not connected")
-    doc = {
-        "user_id":     data.user_id,
-        "destination": data.destination,
-        "form":        data.form,
-        "itinerary":   data.itinerary,
-        "created_at":  datetime.datetime.utcnow(),
-    }
-    result = await db.trips.insert_one(doc)
-    return {"success": True, "trip_id": str(result.inserted_id)}
-
-@app.get("/api/trips/user/{user_id}")
-async def get_user_trips(user_id: str):
-    if db is None:
-        raise HTTPException(500, "Database not connected")
-    cursor = db.trips.find({"user_id": user_id}).sort("created_at", -1)
-    trips  = await cursor.to_list(50)
-    for t in trips:
-        t["_id"]        = str(t["_id"])
-        t["created_at"] = t["created_at"].isoformat()
-    return {"success": True, "data": trips}
-
-@app.delete("/api/trips/{trip_id}")
-async def delete_trip(trip_id: str):
-    if db is None:
-        raise HTTPException(500, "Database not connected")
-    await db.trips.delete_one({"_id": ObjectId(trip_id)})
-    return {"success": True}
-
-@app.post("/api/chat")
-@limiter.limit("20/minute")
-async def trip_chat(request: Request, data: ChatRequest):
-    try:
-        from langchain_groq import ChatGroq
-        from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
-
-        ctx = data.trip_context
-        system = f"""You are Raahi, a friendly and knowledgeable Indian travel assistant.
-You are helping someone plan their trip to {ctx.get('destination', 'India')}.
-
-Their trip:
-- Destination: {ctx.get('destination')}
-- Duration: {ctx.get('days')} days
-- Overview: {ctx.get('overview', '')}
-- Budget tier: {ctx.get('budget_tier', 'mid-range')}
-
-Rules:
-- Keep replies short and practical (3-5 sentences max)
-- Always mention real place names, real restaurants, real costs in ₹
-- Be conversational and warm, like a local friend giving advice
-- For safety questions be honest but reassuring
-- Never make up information — if unsure, say so"""
-
-        llm = ChatGroq(
-            model="llama-3.1-8b-instant",
-            temperature=0.7,
-            max_tokens=400,
-            api_key=os.getenv("GROQ_API_KEY")
-        )
-
-        msgs = [SystemMessage(content=system)]
-        for m in data.messages:
-            msgs.append(HumanMessage(content=m.content) if m.role == "user"
-                        else AIMessage(content=m.content))
-
-        response = await llm.ainvoke(msgs)
-        return {"success": True, "message": response.content}
-
-    except Exception as e:
-        import traceback; traceback.print_exc()
-        raise HTTPException(500, str(e))
-
-class TrainRequest(BaseModel):
-    origin:      str
-    destination: str
-
 TRAIN_PROMPT = """
 You are an expert on Indian Railways with knowledge of all major train routes.
 List the best trains from {origin} to {destination}.
@@ -486,9 +203,302 @@ Return ONLY raw JSON, no markdown, no backticks:
 
 List 3-5 best trains on this route. Use real train names and numbers.
 Only include classes that actually exist on each train.
-Temperature 0.3 — be accurate, not creative.
 """
 
+# ── Pydantic Models ──
+class TripRequest(BaseModel):
+    destination: str
+    startDate:   str
+    endDate:     str
+    travellers:  int
+    tripType:    str
+    budget:      str
+    interests:   List[str]
+    days:        int
+
+class SaveTripRequest(BaseModel):
+    user_id:     str
+    destination: str
+    form:        dict
+    itinerary:   dict
+
+class ChatMessage(BaseModel):
+    role:    str
+    content: str
+
+class ChatRequest(BaseModel):
+    messages:     List[ChatMessage]
+    trip_context: dict
+
+class TrainRequest(BaseModel):
+    origin:      str
+    destination: str
+
+# ══════════════════════════════════════
+# ROUTES
+# ══════════════════════════════════════
+
+@app.get("/api/health")
+async def health():
+    redis = get_redis()
+    db    = get_db()
+    return {
+        "status":   "ok",
+        "message":  "Raahi API running 🇮🇳",
+        "cache":    "connected" if redis else "unavailable",
+        "database": "connected" if db else "unavailable",
+    }
+
+# ── Streaming itinerary ──
+@app.post("/api/generate-itinerary-stream")
+@limiter.limit("5/minute")
+async def generate_itinerary_stream(request: Request, trip: TripRequest):
+    redis     = get_redis()
+    cache_key = make_cache_key(trip)
+
+    if redis:
+        try:
+            cached = redis.get(cache_key)
+            if cached:
+                print(f"✅ Stream cache HIT: {cache_key}")
+                async def stream_cached():
+                    yield f"data: {cached}\n\n"
+                    yield "data: [DONE]\n\n"
+                return StreamingResponse(
+                    stream_cached(),
+                    media_type="text/event-stream",
+                    headers={"Cache-Control": "no-cache", "X-From-Cache": "true"},
+                )
+        except Exception as e:
+            print(f"⚠️  Redis read error: {e}")
+
+    async def generate():
+        try:
+            from langchain_groq import ChatGroq
+            from langchain_core.prompts import ChatPromptTemplate
+
+            llm   = ChatGroq(
+                model="llama-3.1-8b-instant",
+                temperature=0.7,
+                max_tokens=4096,
+                api_key=os.getenv("GROQ_API_KEY"),
+                streaming=True,
+            )
+            chain = ChatPromptTemplate.from_template(PROMPT) | llm
+            full_response = ""
+
+            async for chunk in chain.astream({
+                "destination": trip.destination,
+                "days":        trip.days,
+                "startDate":   trip.startDate,
+                "endDate":     trip.endDate,
+                "travellers":  trip.travellers,
+                "tripType":    trip.tripType,
+                "budget":      BUDGET_MAP.get(trip.budget, trip.budget),
+                "interests":   ", ".join(trip.interests),
+            }):
+                text = chunk.content if hasattr(chunk, "content") else str(chunk)
+                if text:
+                    full_response += text
+                    yield f"data: {json.dumps({'chunk': text})}\n\n"
+
+            raw = full_response.strip()
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"): raw = raw[4:]
+            raw   = raw.strip()
+            start = raw.find("{"); end = raw.rfind("}")
+            if start != -1 and end != -1: raw = raw[start:end+1]
+
+            try:
+                result = json.loads(raw)
+            except json.JSONDecodeError:
+                from json_repair import repair_json
+                result = json.loads(repair_json(raw))
+
+            if redis:
+                try:
+                    redis.setex(cache_key, 604800, json.dumps(result))
+                    print(f"✅ Cached streamed result: {cache_key}")
+                except Exception as e:
+                    print(f"⚠️  Redis write error: {e}")
+
+            yield f"data: {json.dumps({'final': result})}\n\n"
+            yield "data: [DONE]\n\n"
+
+        except Exception as e:
+            import traceback; traceback.print_exc()
+            yield f"data: {json.dumps({'error': str(e)})}\n\n"
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache"},
+    )
+
+# ── Non-streaming fallback ──
+@app.post("/api/generate-itinerary")
+@limiter.limit("5/minute")
+async def generate_itinerary(request: Request, trip: TripRequest):
+    redis     = get_redis()
+    cache_key = make_cache_key(trip)
+
+    if redis:
+        try:
+            cached = redis.get(cache_key)
+            if cached:
+                print(f"✅ Cache HIT: {cache_key}")
+                return {"success": True, "data": json.loads(cached), "from_cache": True}
+        except Exception as e:
+            print(f"⚠️  Redis read error: {e}")
+
+    try:
+        from langchain_groq import ChatGroq
+        from langchain_core.prompts import ChatPromptTemplate
+        from langchain_core.output_parsers import StrOutputParser
+
+        llm   = ChatGroq(
+            model="llama-3.1-8b-instant",
+            temperature=0.7,
+            max_tokens=4096,
+            api_key=os.getenv("GROQ_API_KEY"),
+        )
+        chain = ChatPromptTemplate.from_template(PROMPT) | llm | StrOutputParser()
+        raw   = await chain.ainvoke({
+            "destination": trip.destination,
+            "days":        trip.days,
+            "startDate":   trip.startDate,
+            "endDate":     trip.endDate,
+            "travellers":  trip.travellers,
+            "tripType":    trip.tripType,
+            "budget":      BUDGET_MAP.get(trip.budget, trip.budget),
+            "interests":   ", ".join(trip.interests),
+        })
+
+        raw   = raw.strip()
+        if raw.startswith("```"):
+            raw = raw.split("```")[1]
+            if raw.startswith("json"): raw = raw[4:]
+        raw   = raw.strip()
+        start = raw.find("{"); end = raw.rfind("}")
+        if start != -1 and end != -1: raw = raw[start:end+1]
+
+        result = json.loads(raw)
+
+        if redis:
+            try:
+                redis.setex(cache_key, 604800, json.dumps(result))
+            except Exception as e:
+                print(f"⚠️  Redis write error: {e}")
+
+        return {"success": True, "data": result, "from_cache": False}
+
+    except json.JSONDecodeError as e:
+        try:
+            from json_repair import repair_json
+            return {"success": True, "data": json.loads(repair_json(raw)), "from_cache": False}
+        except Exception:
+            import traceback; traceback.print_exc()
+            raise HTTPException(500, f"AI returned invalid JSON: {e}")
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        raise HTTPException(500, str(e))
+
+# ── Trips ──
+@app.post("/api/trips")
+async def save_trip(data: SaveTripRequest):
+    db = get_db()
+    if db is None:
+        raise HTTPException(500, "Database not connected")
+    doc = {
+        "user_id":     data.user_id,
+        "destination": data.destination,
+        "form":        data.form,
+        "itinerary":   data.itinerary,
+        "created_at":  datetime.datetime.utcnow(),
+    }
+    result = await db.trips.insert_one(doc)
+    return {"success": True, "trip_id": str(result.inserted_id)}
+
+@app.get("/api/trips/user/{user_id}")
+async def get_user_trips(user_id: str):
+    db = get_db()
+    if db is None:
+        raise HTTPException(500, "Database not connected")
+    cursor = db.trips.find({"user_id": user_id}).sort("created_at", -1)
+    trips  = await cursor.to_list(50)
+    for t in trips:
+        t["_id"]        = str(t["_id"])
+        t["created_at"] = t["created_at"].isoformat()
+    return {"success": True, "data": trips}
+
+@app.delete("/api/trips/{trip_id}")
+async def delete_trip(trip_id: str):
+    db = get_db()
+    if db is None:
+        raise HTTPException(500, "Database not connected")
+    await db.trips.delete_one({"_id": ObjectId(trip_id)})
+    return {"success": True}
+
+# ── Cache clear ──
+@app.post("/api/clear-cache")
+async def clear_cache(trip: TripRequest):
+    redis = get_redis()
+    if redis:
+        try:
+            cache_key = make_cache_key(trip)
+            redis.delete(cache_key)
+            print(f"🗑️  Cache cleared: {cache_key}")
+        except Exception as e:
+            print(f"⚠️  Cache clear error: {e}")
+    return {"success": True}
+
+# ── AI Chat ──
+@app.post("/api/chat")
+@limiter.limit("20/minute")
+async def trip_chat(request: Request, data: ChatRequest):
+    try:
+        from langchain_groq import ChatGroq
+        from langchain_core.messages import SystemMessage, HumanMessage, AIMessage
+
+        ctx    = data.trip_context
+        system = f"""You are Raahi, a friendly and knowledgeable Indian travel assistant.
+You are helping someone plan their trip to {ctx.get('destination', 'India')}.
+
+Their trip:
+- Destination: {ctx.get('destination')}
+- Duration: {ctx.get('days')} days
+- Overview: {ctx.get('overview', '')}
+- Budget tier: {ctx.get('budget_tier', 'mid-range')}
+
+Rules:
+- Keep replies short and practical (3-5 sentences max)
+- Always mention real place names, real restaurants, real costs in ₹
+- Be conversational and warm, like a local friend giving advice
+- For safety questions be honest but reassuring
+- Never make up information — if unsure, say so"""
+
+        llm  = ChatGroq(
+            model="llama-3.1-8b-instant",
+            temperature=0.7,
+            max_tokens=400,
+            api_key=os.getenv("GROQ_API_KEY"),
+        )
+        msgs = [SystemMessage(content=system)]
+        for m in data.messages:
+            msgs.append(
+                HumanMessage(content=m.content) if m.role == "user"
+                else AIMessage(content=m.content)
+            )
+        response = await llm.ainvoke(msgs)
+        return {"success": True, "message": response.content}
+
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        raise HTTPException(500, str(e))
+
+# ── Train finder ──
 @app.post("/api/trains")
 @limiter.limit("10/minute")
 async def find_trains(request: Request, data: TrainRequest):
@@ -509,26 +519,28 @@ async def find_trains(request: Request, data: TrainRequest):
         from langchain_core.prompts import ChatPromptTemplate
         from langchain_core.output_parsers import StrOutputParser
 
-        llm   = ChatGroq(model="llama-3.3-70b-versatile", temperature=0.3,
-                         max_tokens=2000, api_key=os.getenv("GROQ_API_KEY"))
+        llm   = ChatGroq(
+            model="llama-3.1-8b-instant",
+            temperature=0.3,
+            max_tokens=2000,
+            api_key=os.getenv("GROQ_API_KEY"),
+        )
         chain = ChatPromptTemplate.from_template(TRAIN_PROMPT) | llm | StrOutputParser()
-
-        raw = await chain.ainvoke({
+        raw   = await chain.ainvoke({
             "origin":      data.origin,
             "destination": data.destination,
         })
 
-        raw = raw.strip()
+        raw   = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"): raw = raw[4:]
-        raw = raw.strip()
-        start = raw.find('{'); end = raw.rfind('}')
+        raw   = raw.strip()
+        start = raw.find("{"); end = raw.rfind("}")
         if start != -1 and end != -1: raw = raw[start:end+1]
 
         result = json.loads(raw)
 
-        # Cache for 30 days — train schedules rarely change
         if redis:
             try:
                 redis.setex(cache_key, 2592000, json.dumps(result))
@@ -547,17 +559,5 @@ async def find_trains(request: Request, data: TrainRequest):
     except Exception as e:
         import traceback; traceback.print_exc()
         raise HTTPException(500, str(e))
-    
-@app.post("/api/clear-cache")
-async def clear_cache(trip: TripRequest):
-    redis = get_redis()
-    if redis:
-        try:
-            cache_key = make_cache_key(trip)
-            redis.delete(cache_key)
-            print(f"🗑️  Cache cleared: {cache_key}")
-        except Exception as e:
-            print(f"⚠️  Cache clear error: {e}")
-    return {"success": True}
 
 handler = Mangum(app)
