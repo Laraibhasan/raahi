@@ -71,8 +71,8 @@
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/trip_planner.git
-cd trip_planner
+git clone https://github.com/yourusername/raahi.git
+cd raahi
 ```
 
 ### 2. Set up the backend
@@ -124,7 +124,7 @@ The app will be available at `http://localhost:5173`. API calls to `/api/*` are 
 ## 📁 Project Structure
 
 ```
-trip_planner/
+raahi/
 ├── api/
 │   ├── index.py          # FastAPI app — all routes
 │   ├── requirements.txt  # Python dependencies
