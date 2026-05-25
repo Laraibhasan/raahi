@@ -185,7 +185,8 @@ export default function Home() {
         <motion.div
           animate={{ y: [0, 8, 0] }}
           transition={{ repeat: Infinity, duration: 2 }}
-          className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-1.5"
+          // Changed: left-0 right-0 instead of left-1/2. Added w-full.
+          className="absolute bottom-8 left-0 right-0 flex flex-col items-center gap-1.5"
         >
           <div className="w-px h-8 bg-white/30" />
           <p className="text-white/40 text-[10px] tracking-[0.3em]">SCROLL</p>
