@@ -175,7 +175,7 @@ export default function TrainFinder({ destination }) {
         <label className="text-xs text-[#8B5E3C] font-semibold mb-1.5 block">
           Your departure city
         </label>
-        <div className="flex gap-2">
+        <div className="flex flex-col min-[400px]:flex-row gap-2">
           <div className="flex-1 flex items-center gap-2 border-2 border-[#F0E6DC] focus-within:border-[#C4663A] rounded-xl px-3 py-2.5 transition-colors">
             <MapPin size={14} className="text-[#C4663A] shrink-0" />
             <input
@@ -187,11 +187,11 @@ export default function TrainFinder({ destination }) {
               className="flex-1 outline-none text-[#3D2314] text-sm bg-transparent placeholder-[#8B5E3C]/40"
             />
           </div>
-          <button
-            onClick={handleSearch}
-            disabled={!origin.trim() || loading}
-            className="bg-[#C4663A] hover:bg-[#A85530] disabled:opacity-50 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 flex items-center gap-2"
-          >
+            <button
+              onClick={handleSearch}
+              disabled={!origin.trim() || loading}
+              className="bg-[#C4663A] hover:bg-[#A85530] disabled:opacity-50 text-white px-4 py-2.5 rounded-xl text-sm font-semibold transition-all active:scale-95 flex items-center justify-center gap-2 w-full min-[400px]:w-auto"
+            >
             {loading
               ? <Loader2 size={14} className="animate-spin" />
               : <Train size={14} />
