@@ -1,15 +1,17 @@
-# 🧳 Raahi — AI-Powered Indian Travel Planner
-
 <div align="center">
 
-![Raahi](https://img.shields.io/badge/Raahi-Travel%20Planner-orange?style=for-the-badge)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-badge&logo=fastapi)
-![React](https://img.shields.io/badge/React-Vite-61DAFB?style=for-the-badge&logo=react)
-![Vercel](https://img.shields.io/badge/Deployed-Vercel-black?style=for-the-badge&logo=vercel)
+# राही · Raahi
 
-**Plan your perfect Indian trip in seconds with AI-generated itineraries, real costs, and local insights.**
+### Your AI Travel Companion for Incredible India 🇮🇳
 
-[Live Demo](https://raahiapp.vercel.app) · [Report Bug](https://github.com/yourusername/trip_planner/issues) · [Request Feature](https://github.com/yourusername/trip_planner/issues)
+[![Live Demo](https://img.shields.io/badge/Live%20Demo-raahiapp.vercel.app-C4663A?style=for-the-badge)](https://raahiapp.vercel.app)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react)](https://react.dev)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=for-the-badge&logo=fastapi)](https://fastapi.tiangolo.com)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas-47A248?style=for-the-badge&logo=mongodb)](https://mongodb.com)
+
+Raahi is a full-stack AI-powered travel itinerary planner built specifically for Indian travellers. Tell Raahi where you want to go — it generates a complete day-by-day itinerary with real hotels, restaurants, transport options, and costs in ₹, all powered by LLMs.
+
+![Raahi Hero](https://images.unsplash.com/photo-1524492412937-b28074a5d7da?w=1200&q=80)
 
 </div>
 
@@ -17,207 +19,266 @@
 
 ## ✨ Features
 
-- 🤖 **AI Itinerary Generation** — Streaming day-by-day travel plans powered by LLaMA 3.3 70B via Groq
-- 💰 **Budget-Aware Planning** — Four tiers: Budget (₹1k–2.5k/day), Mid-range, Premium, and Luxury
-- 🚆 **Train Finder** — Discover best trains between any two Indian cities with real fares and schedules
-- 💬 **Trip Chat Assistant** — Ask follow-up questions about your itinerary with a context-aware AI chat
-- 🗺️ **Multi-Day Itineraries** — Morning, afternoon, and evening activities with meal and stay recommendations
-- 💾 **Save & Manage Trips** — Save itineraries to your profile and revisit them anytime
-- ⚡ **Smart Caching** — Redis-backed caching (7-day TTL) so repeated queries are instant
-- 🔐 **Auth via Clerk** — Secure user authentication out of the box
+| Feature | Description |
+|---|---|
+| 🤖 **AI Itinerary Generation** | Streaming day-by-day trip plans using Groq + LangChain |
+| 💰 **INR Budget Planning** | Strict budget tiers from ₹1,000/day to luxury ₹20,000+/day |
+| 🚂 **Train Route Finder** | AI-suggested trains with class fares and IRCTC booking links |
+| 💬 **AI Trip Assistant** | Floating chat to ask anything about your specific trip |
+| 🗺️ **Interactive Maps** | Leaflet + OpenStreetMap showing destination and attractions |
+| 📸 **Destination Images** | Dynamic Unsplash photos fetched per destination |
+| 🌤️ **Best Time Notes** | Season and weather guidance per travel dates |
+| 🔖 **Save Trips** | Save itineraries to MongoDB, view in My Trips |
+| ↺ **Regenerate** | One-click fresh itinerary with Redis cache clearing |
+| ⚡ **Redis Caching** | Instant responses for repeat destinations via Upstash |
+| 🔐 **Auth** | Email/password + Google OAuth via Clerk |
+| 📱 **PWA** | Installable on Android and iOS |
+| 🖨️ **Print/Share** | Print-friendly layout and native share API |
+| 🚦 **Rate Limiting** | SlowAPI protection on all AI routes |
+| 🐳 **Docker** | Containerised FastAPI backend |
 
 ---
 
 ## 🛠️ Tech Stack
 
 ### Frontend
-| Technology | Purpose |
-|---|---|
-| React + Vite | UI framework |
-| Tailwind CSS | Styling |
-| Axios | HTTP client |
-| Clerk | Authentication |
+- **React 19** + **Vite** — UI framework and build tool
+- **Tailwind CSS** — utility-first styling
+- **Framer Motion** — animations and transitions
+- **React Router** — client-side routing
+- **Leaflet + React-Leaflet** — interactive maps
+- **Clerk** — authentication (email + Google OAuth)
+- **Lucide React** — icons
 
 ### Backend
-| Technology | Purpose |
-|---|---|
-| FastAPI | REST API framework |
-| LangChain + Groq | LLM orchestration (LLaMA 3.3 70B) |
-| MongoDB + Motor | Database (async) |
-| Upstash Redis | Response caching |
-| Mangum | AWS Lambda / Vercel adapter |
-| SlowAPI | Rate limiting |
+- **FastAPI** — async Python API framework
+- **Mangum** — AWS Lambda / Vercel serverless adapter
+- **LangChain + Groq** — LLM orchestration (Llama 3.1 8B)
+- **Motor** — async MongoDB driver
+- **SlowAPI** — rate limiting
+- **Upstash Redis** — serverless caching
 
 ### Infrastructure
-| Technology | Purpose |
-|---|---|
-| Vercel | Hosting (frontend + serverless API) |
-| MongoDB Atlas | Cloud database |
-| Upstash | Serverless Redis |
+- **MongoDB Atlas** — M0 free tier database
+- **Upstash Redis** — HTTP-based Redis (free tier)
+- **Vercel** — frontend + serverless backend hosting
+- **Clerk** — auth infrastructure
+- **Unsplash API** — destination images
+- **OpenStreetMap + Nominatim** — maps and geocoding
+- **Groq API** — LLM inference (free tier)
 
 ---
 
-## 🚀 Getting Started
+## 🏗️ Architecture
 
-### Prerequisites
-
-- Node.js 18+
-- Python 3.11+
-- MongoDB Atlas account
-- Groq API key (free at [console.groq.com](https://console.groq.com))
-- Upstash Redis account (free at [upstash.com](https://upstash.com))
-- Clerk account (free at [clerk.com](https://clerk.com))
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/yourusername/raahi.git
-cd raahi
 ```
-
-### 2. Set up the backend
-
-```bash
-cd api
-pip install -r requirements.txt
+┌─────────────────────────────────────────────────────────────┐
+│                        Vercel                               │
+│                                                             │
+│   ┌──────────────────┐      ┌──────────────────────────┐   │
+│   │  React Frontend  │ ───▶ │  FastAPI Backend          │   │
+│   │  (Static/Vite)   │      │  (Serverless /api/*)      │   │
+│   └──────────────────┘      └──────────┬─────────────── ┘   │
+└─────────────────────────────────────────────────────────────┘
+                                         │
+              ┌──────────────────────────┼──────────────┐
+              │                          │              │
+     ┌────────▼──────┐        ┌─────────▼──────┐  ┌───▼────┐
+     │ MongoDB Atlas │        │ Upstash Redis  │  │  Groq  │
+     │  (trips DB)   │        │  (LLM cache)   │  │  API   │
+     └───────────────┘        └────────────────┘  └────────┘
 ```
-
-Create `api/.env`:
-
-```env
-GROQ_API_KEY=your_groq_api_key
-MONGODB_URI=your_mongodb_atlas_uri
-UPSTASH_REDIS_REST_URL=your_upstash_url
-UPSTASH_REDIS_REST_TOKEN=your_upstash_token
-```
-
-Run the backend locally:
-
-```bash
-uvicorn index:app --reload --port 8000
-```
-
-### 3. Set up the frontend
-
-```bash
-# from project root
-npm install
-```
-
-Create `.env` in the project root:
-
-```env
-VITE_CLERK_PUBLISHABLE_KEY=your_clerk_publishable_key
-VITE_UNSPLASH_ACCESS_KEY=your_unsplash_key   # optional, for destination images
-```
-
-Run the frontend:
-
-```bash
-npm run dev
-```
-
-The app will be available at `http://localhost:5173`. API calls to `/api/*` are proxied to `http://localhost:8000` via Vite's dev proxy.
 
 ---
 
 ## 📁 Project Structure
 
 ```
-raahi/
-├── api/
-│   ├── index.py          # FastAPI app — all routes
-│   ├── requirements.txt  # Python dependencies
-│   ├── Dockerfile        # For local Docker dev
-│   └── .env              # Backend secrets (not committed)
-├── src/
+trip_planner/
+├── api/                        # FastAPI backend
+│   ├── index.py                # All routes, LangChain chains, MongoDB, Redis
+│   ├── requirements.txt        # Python dependencies
+│   ├── runtime.txt             # Python 3.11 for Vercel
+│   └── Dockerfile              # Container config
+│
+├── src/                        # React frontend
+│   ├── pages/
+│   │   ├── Home.jsx            # Landing page, destination discovery
+│   │   ├── Plan.jsx            # 3-step trip planning form
+│   │   ├── Itinerary.jsx       # AI itinerary results + all tabs
+│   │   ├── MyTrips.jsx         # Saved trips dashboard
+│   │   ├── Login.jsx           # Clerk sign in
+│   │   └── Signup.jsx          # Clerk sign up
+│   │
+│   ├── components/
+│   │   ├── Navbar.jsx          # Responsive, scroll-aware navbar
+│   │   ├── TripAssistant.jsx   # Floating AI chat bubble
+│   │   ├── TrainFinder.jsx     # Train route search
+│   │   └── InstallPrompt.jsx   # PWA install banner
+│   │
 │   ├── api/
-│   │   └── client.js     # Axios client + all API calls
-│   ├── components/       # Reusable React components
-│   ├── pages/            # Route-level page components
-│   ├── hooks/            # Custom React hooks
-│   ├── utils/            # Helper functions
-│   └── assets/           # Static assets
+│   │   └── client.js           # Axios client + all API functions
+│   │
+│   └── hooks/
+│       └── useDestinationImage.js  # Unsplash image fetching hook
+│
 ├── public/
-├── vercel.json           # Vercel deployment config
-├── vite.config.js        # Vite config with API proxy
-├── tailwind.config.js
-└── package.json
+│   ├── icon-192.png            # PWA icon
+│   └── icon-512.png            # PWA icon
+│
+├── vercel.json                 # Vercel build + routing config
+├── vite.config.js              # Vite + PWA plugin config
+└── tailwind.config.js          # Custom earthy colour palette
 ```
 
 ---
 
-## 🌐 Deployment (Vercel)
+## 🚀 Local Development
 
-### Environment Variables
+### Prerequisites
+- Node.js 18+
+- Python 3.11+
+- Git
 
-Set these in **Vercel Dashboard → Settings → Environment Variables**:
+### 1. Clone the repo
+```bash
+git clone https://github.com/yourusername/trip_planner.git
+cd trip_planner
+```
 
-| Variable | Description |
-|---|---|
-| `GROQ_API_KEY` | Groq API key for LLM |
-| `MONGODB_URI` | MongoDB Atlas connection string |
-| `UPSTASH_REDIS_REST_URL` | Upstash Redis URL |
-| `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis token |
-| `VITE_CLERK_PUBLISHABLE_KEY` | Clerk publishable key |
-| `VITE_UNSPLASH_ACCESS_KEY` | Unsplash API key (optional) |
+### 2. Install frontend dependencies
+```bash
+npm install
+```
 
-> **Note:** `VITE_API_URL` should be left **empty** or not set — the app uses relative paths in production.
+### 3. Install backend dependencies
+```bash
+cd api
+pip install -r requirements.txt
+```
 
-### `vercel.json`
+### 4. Set up environment variables
 
-```json
-{
-  "version": 2,
-  "builds": [
-    { "src": "api/index.py", "use": "@vercel/python" },
-    { "src": "package.json", "use": "@vercel/static-build", "config": { "distDir": "dist" } }
-  ],
-  "routes": [
-    { "src": "/api/(.*)", "dest": "api/index.py" },
-    { "src": "/(.*)", "dest": "/$1" }
-  ]
-}
+Create `.env` in the root:
+```env
+VITE_CLERK_PUBLISHABLE_KEY=pk_test_...
+VITE_UNSPLASH_ACCESS_KEY=...
+```
+
+Create `.env` in `api/`:
+```env
+GROQ_API_KEY=gsk_...
+MONGODB_URI=mongodb+srv://...
+UPSTASH_REDIS_REST_URL=https://...
+UPSTASH_REDIS_REST_TOKEN=...
+```
+
+### 5. Run the development servers
+
+Terminal 1 — Frontend:
+```bash
+npm run dev
+```
+
+Terminal 2 — Backend:
+```bash
+cd api
+python -m uvicorn index:app --reload
+```
+
+Frontend → `http://localhost:5173`
+Backend → `http://localhost:8000`
+API Docs → `http://localhost:8000/docs`
+
+---
+
+## 🐳 Docker (Backend)
+
+```bash
+cd api
+docker build -t raahi-api .
+docker run -p 8000:8000 --env-file .env raahi-api
 ```
 
 ---
 
-## 📡 API Reference
+## 🌐 Deployment
 
-| Method | Endpoint | Description |
+Both frontend and backend deploy to **Vercel** from the same repo.
+
+### Environment variables to set in Vercel:
+
+```
+GROQ_API_KEY
+MONGODB_URI
+UPSTASH_REDIS_REST_URL
+UPSTASH_REDIS_REST_TOKEN
+VITE_CLERK_PUBLISHABLE_KEY
+VITE_UNSPLASH_ACCESS_KEY
+```
+
+Vercel auto-detects Vite and builds the frontend. The `api/` folder is deployed as serverless Python functions.
+
+---
+
+## 🔌 API Endpoints
+
+| Method | Endpoint | Description | Rate Limit |
+|---|---|---|---|
+| `GET` | `/api/health` | Health check + cache status | — |
+| `POST` | `/api/generate-itinerary-stream` | Streaming AI itinerary (SSE) | 5/min |
+| `POST` | `/api/generate-itinerary` | Non-streaming fallback | 5/min |
+| `POST` | `/api/clear-cache` | Clear Redis cache for a trip | — |
+| `POST` | `/api/trips` | Save a trip | — |
+| `GET` | `/api/trips/user/{user_id}` | Get all trips for a user | — |
+| `DELETE` | `/api/trips/{trip_id}` | Delete a trip | — |
+| `POST` | `/api/chat` | AI trip assistant chat | 20/min |
+| `POST` | `/api/trains` | Find trains between cities | 10/min |
+
+---
+
+## 🎨 Design
+
+Raahi uses a custom **earthy & warm** colour palette inspired by Indian architecture and landscapes:
+
+| Token | Hex | Usage |
 |---|---|---|
-| `GET` | `/api/health` | Health check |
-| `POST` | `/api/generate-itinerary-stream` | Stream AI itinerary generation |
-| `POST` | `/api/generate-itinerary` | Generate itinerary (non-streaming) |
-| `POST` | `/api/chat` | Trip chat assistant |
-| `POST` | `/api/trains` | Find trains between two cities |
-| `POST` | `/api/trips` | Save a trip |
-| `GET` | `/api/trips/user/{user_id}` | Get all trips for a user |
-| `DELETE` | `/api/trips/{trip_id}` | Delete a saved trip |
-| `POST` | `/api/clear-cache` | Clear cached itinerary |
-
-Rate limits: 5 req/min on itinerary endpoints, 20 req/min on chat, 10 req/min on trains.
+| Terracotta | `#C4663A` | Primary actions, highlights |
+| Deep Brown | `#2C1810` | Dark sections, hero backgrounds |
+| Warm Brown | `#8B5E3C` | Secondary text |
+| Cream | `#FAFAF8` | Page background |
+| Saffron Light | `#E8A87C` | Accent on dark backgrounds |
 
 ---
 
-## 🤝 Contributing
+## 📦 Free Tier Usage
 
-Contributions are welcome!
+| Service | Free Limit | Usage |
+|---|---|---|
+| Groq API | 14,400 req/day | LLM inference |
+| MongoDB Atlas | 512 MB | Trip storage |
+| Upstash Redis | 10,000 req/day | Response caching |
+| Vercel | 100 GB bandwidth | Hosting |
+| Clerk | 10,000 MAU | Authentication |
+| Unsplash | 50 req/hr (dev) | Destination images |
+| OpenStreetMap | Unlimited | Maps + geocoding |
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+**Total monthly cost: ₹0**
 
 ---
 
-## 📄 License
+## 🙏 Acknowledgements
 
-Distributed under the MIT License. See `LICENSE` for more information.
+- [Groq](https://groq.com) — blazing fast LLM inference
+- [LangChain](https://langchain.com) — LLM orchestration
+- [Clerk](https://clerk.com) — authentication
+- [Upstash](https://upstash.com) — serverless Redis
+- [Unsplash](https://unsplash.com) — beautiful photography
+- [OpenStreetMap](https://openstreetmap.org) — free maps
 
 ---
 
 <div align="center">
-Made with ❤️ for Indian travellers
+  <p>Built with ❤️ for Indian travellers</p>
+  <p><strong>राही</strong> — traveller in Hindi</p>
 </div>
