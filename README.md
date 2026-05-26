@@ -94,7 +94,7 @@ Raahi is a full-stack AI-powered travel itinerary planner built specifically for
 ## 📁 Project Structure
 
 ```
-trip_planner/
+raahi/
 ├── api/                        # FastAPI backend
 │   ├── index.py                # All routes, LangChain chains, MongoDB, Redis
 │   ├── requirements.txt        # Python dependencies
@@ -142,8 +142,8 @@ trip_planner/
 
 ### 1. Clone the repo
 ```bash
-git clone https://github.com/yourusername/trip_planner.git
-cd trip_planner
+git clone https://github.com/yourusername/raahi.git
+cd raahi
 ```
 
 ### 2. Install frontend dependencies
