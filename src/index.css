@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { font-family: 'Inter', sans-serif; background-color: #FAFAF8; color: #1a1a1a; }
+
+@media print {
+  nav,
+  .no-print,
+  .sticky          { display: none !important; }
+
+  body             { background: white !important; color: #000 !important; }
+  .min-h-screen    { min-height: unset !important; }
+  .pt-16           { padding-top: 0 !important; }
+
+  /* hero prints as plain header */
+  [style*="backgroundImage"] {
+    background-image: none !important;
+    background-color: #2C1810 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* show all tab content at once when printing */
+  .max-w-4xl       { max-width: 100% !important; padding: 0 16px !important; }
+
+  /* page breaks between days */
+  .print-page-break { page-break-before: always; }
+}
