@@ -68,31 +68,31 @@ def make_cache_key(trip) -> str:
 
 # ── Constants ──
 BUDGET_MAP = {
-    "budget": """STRICT BUDGET TIER — ₹1,000–₹2,500/day per person total.
-        Accommodation: ₹300–₹700/night (hostels, dharamshalas, budget guesthouses like OYO Townhouse).
-        Meals: ₹50–₹150/meal (street food, dhabas, local thali joints — never restaurants).
-        Transport: state buses, shared autos, local trains only. No private taxis.
-        Sightseeing: only free or under ₹100 entry.
-        Every cost_inr field must reflect this — keep individual activity costs under ₹200.""",
+    "budget": """STRICT BUDGET TIER — ₹800–₹1,800/day per person total.
+        Accommodation: ₹200–₹500/night (dormitories, dharamshalas, basic OYO rooms).
+        Meals: ₹40–₹120/meal (street food, dhabas, local thali only).
+        Transport: state buses, shared autos, local trains only. Zero private taxis.
+        Sightseeing: only free or under ₹80 entry fees.
+        Every cost_inr field must reflect this. Keep daily_cost_estimate under ₹1,800.""",
 
-    "mid": """MID-RANGE TIER — ₹3,000–₹7,000/day per person total.
-        Accommodation: ₹1,200–₹3,000/night (2-3 star hotels, clean guesthouses).
-        Meals: ₹200–₹600/meal (proper restaurants, not fine dining).
-        Transport: Ola/Uber, AC buses, sleeper trains.
-        Sightseeing: standard entry fees ₹100–₹500.
-        Keep individual activity costs realistic for this range.""",
+    "mid": """MID-RANGE TIER — ₹1,800–₹4,500/day per person total.
+        Accommodation: ₹800–₹2,000/night (budget hotels, clean guesthouses).
+        Meals: ₹150–₹450/meal (sit-down restaurants, not fine dining).
+        Transport: Ola/Uber, AC state buses, sleeper class trains.
+        Sightseeing: standard entry fees ₹80–₹300.
+        Keep daily_cost_estimate between ₹1,800 and ₹4,500.""",
 
-    "premium": """PREMIUM TIER — ₹8,000–₹18,000/day per person total.
-        Accommodation: ₹4,000–₹10,000/night (4-star hotels, heritage properties).
-        Meals: ₹800–₹2,000/meal (fine dining, rooftop restaurants).
-        Transport: private cabs, AC trains, domestic flights.
-        Sightseeing: premium experiences, guided tours ₹500–₹2,000.""",
+    "premium": """PREMIUM TIER — ₹4,500–₹10,000/day per person total.
+        Accommodation: ₹2,500–₹6,000/night (3-4 star hotels, boutique stays).
+        Meals: ₹500–₹1,500/meal (good restaurants, some fine dining).
+        Transport: private cabs, AC trains, occasional short flights.
+        Sightseeing: guided tours ₹300–₹1,500.""",
 
-    "luxury": """LUXURY TIER — ₹20,000+/day per person total.
-        Accommodation: ₹12,000–₹50,000/night (5-star, palace hotels like Taj/Oberoi/ITC).
-        Meals: ₹2,000–₹5,000/meal (fine dining, chef's table experiences).
-        Transport: private chauffeur, business class flights, helicopter transfers.
-        Sightseeing: private guided tours, exclusive experiences.""",
+    "luxury": """LUXURY TIER — ₹10,000+/day per person total.
+        Accommodation: ₹7,000–₹40,000/night (5-star, palace hotels like Taj/Oberoi).
+        Meals: ₹1,500–₹4,000/meal (fine dining, chef's table).
+        Transport: private chauffeur, business class, helicopter transfers.
+        Sightseeing: private guided tours, exclusive access.""",
 }
 
 PROMPT = """
@@ -102,19 +102,21 @@ real restaurants, real hotels.
 
 CRITICAL BUDGET RULE: You MUST strictly follow the budget tier. Every single
 cost_inr value, daily_cost_estimate, and budget_breakdown number must stay
-within the specified range. A budget traveller CANNOT afford ₹2,000 hotel rooms
-or ₹500 meals. Be realistic about Indian travel costs.
+within the specified range. Be realistic about Indian travel costs.
 
 Trip details:
 - Destination: {destination}
 - Duration: {days} days ({startDate} to {endDate})
-- Travellers: {travellers} people ({tripType})
+- Travellers: {travellers} people
 - Budget tier: {budget}
 - Interests: {interests}
 
-The budget_breakdown totals must add up correctly and match the tier.
-For budget trips, total_per_person should be under ₹2,500/day × {days} days.
-For mid trips, total_per_person should be under ₹7,000/day × {days} days.
+BUDGET CALCULATION RULES — follow exactly:
+- total_per_person = sum of all daily_cost_estimates across all days
+- grand_total = total_per_person × {travellers} (multiply by number of travellers)
+- For budget trips, total_per_person should be under ₹1,800 × {days}
+- For mid trips, total_per_person should be under ₹4,500 × {days}
+- Double-check your maths before returning.
 
 Return ONLY a raw JSON object — no markdown, no backticks, no extra text. Schema:
 
@@ -141,17 +143,17 @@ Return ONLY a raw JSON object — no markdown, no backticks, no extra text. Sche
         "mid_option":     "name, ~₹X/night",
         "premium_option": "name, ~₹X/night"
       }},
-      "daily_cost_estimate": 2500
+      "daily_cost_estimate": 1500
     }}
   ],
   "budget_breakdown": {{
-    "accommodation": 5000,
-    "food":          3000,
-    "local_transport": 1500,
-    "sightseeing":   2000,
-    "shopping_misc": 1000,
-    "total_per_person": 12500,
-    "grand_total":   25000
+    "accommodation": 3000,
+    "food":          2000,
+    "local_transport": 800,
+    "sightseeing":   1200,
+    "shopping_misc": 500,
+    "total_per_person": 7500,
+    "grand_total":   22500
   }},
   "transport": {{
     "how_to_reach": "best way from major cities like Delhi/Mumbai",
@@ -211,7 +213,7 @@ class TripRequest(BaseModel):
     startDate:   str
     endDate:     str
     travellers:  int
-    tripType:    str
+    tripType:    str=""
     budget:      str
     interests:   List[str]
     days:        int
@@ -315,6 +317,12 @@ async def generate_itinerary_stream(request: Request, trip: TripRequest):
             except json.JSONDecodeError:
                 from json_repair import repair_json
                 result = json.loads(repair_json(raw))
+            
+            # Force correct grand_total regardless of what AI calculated
+            if 'budget_breakdown' in result:
+                result['budget_breakdown']['grand_total'] = (
+                    result['budget_breakdown'].get('total_per_person', 0) * trip.travellers
+                )
 
             if redis:
                 try:
@@ -385,6 +393,12 @@ async def generate_itinerary(request: Request, trip: TripRequest):
         if start != -1 and end != -1: raw = raw[start:end+1]
 
         result = json.loads(raw)
+
+        # Force correct grand_total regardless of what AI calculated
+        if 'budget_breakdown' in result:
+            result['budget_breakdown']['grand_total'] = (
+                result['budget_breakdown'].get('total_per_person', 0) * trip.travellers
+            )
 
         if redis:
             try:

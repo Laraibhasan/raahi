@@ -6,46 +6,38 @@ import {
   ArrowLeft, Check
 } from 'lucide-react'
 
-const tripTypes = [
-  { id: 'solo',    label: 'Solo',    emoji: '🧳', desc: 'Just me'        },
-  { id: 'couple',  label: 'Couple',  emoji: '💑', desc: 'Me & partner'   },
-  { id: 'family',  label: 'Family',  emoji: '👨‍👩‍👧', desc: 'With family'   },
-  { id: 'friends', label: 'Friends', emoji: '👯', desc: 'Friend group'   },
-]
-
 const budgets = [
-  { id: 'budget',  label: 'Budget',    range: '₹1,000 – ₹3,000/day',  desc: 'Hostels, local food, buses'        },
-  { id: 'mid',     label: 'Mid-Range', range: '₹3,000 – ₹8,000/day',  desc: 'Hotels, restaurants, trains'       },
-  { id: 'premium', label: 'Premium',   range: '₹8,000 – ₹20,000/day', desc: 'Resorts, fine dining, flights'     },
-  { id: 'luxury',  label: 'Luxury',    range: '₹20,000+/day',          desc: 'Heritage hotels, private tours'    },
+  { id: 'budget',  label: 'Budget',    range: '₹800 – ₹1,800/day',   desc: 'Hostels, street food, buses'      },
+  { id: 'mid',     label: 'Mid-Range', range: '₹1,800 – ₹4,500/day', desc: 'Hotels, restaurants, trains'      },
+  { id: 'premium', label: 'Premium',   range: '₹4,500 – ₹10,000/day',desc: 'Resorts, fine dining, flights'    },
+  { id: 'luxury',  label: 'Luxury',    range: '₹10,000+/day',         desc: 'Heritage hotels, private tours'   },
 ]
 
 const interests = [
-  { id: 'culture',    label: 'Culture & Heritage',  emoji: '🏛️' },
-  { id: 'food',       label: 'Food & Street Food',  emoji: '🍛' },
-  { id: 'adventure',  label: 'Adventure & Trekking', emoji: '🏔️' },
-  { id: 'nature',     label: 'Nature & Wildlife',   emoji: '🌿' },
-  { id: 'beaches',    label: 'Beaches & Water',     emoji: '🏖️' },
-  { id: 'spiritual',  label: 'Temples & Spiritual', emoji: '🙏' },
-  { id: 'shopping',   label: 'Markets & Shopping',  emoji: '🛍️' },
-  { id: 'photography',label: 'Photography',         emoji: '📸' },
-  { id: 'nightlife',  label: 'Nightlife & Music',   emoji: '🎵' },
-  { id: 'wellness',   label: 'Yoga & Wellness',     emoji: '🧘' },
+  { id: 'culture',     label: 'Culture & Heritage',   emoji: '🏛️' },
+  { id: 'food',        label: 'Food & Street Food',   emoji: '🍛' },
+  { id: 'adventure',   label: 'Adventure & Trekking', emoji: '🏔️' },
+  { id: 'nature',      label: 'Nature & Wildlife',    emoji: '🌿' },
+  { id: 'beaches',     label: 'Beaches & Water',      emoji: '🏖️' },
+  { id: 'spiritual',   label: 'Temples & Spiritual',  emoji: '🙏' },
+  { id: 'shopping',    label: 'Markets & Shopping',   emoji: '🛍️' },
+  { id: 'photography', label: 'Photography',          emoji: '📸' },
+  { id: 'nightlife',   label: 'Nightlife & Music',    emoji: '🎵' },
+  { id: 'wellness',    label: 'Yoga & Wellness',      emoji: '🧘' },
 ]
 
-const STEPS = ['Where & When', 'Who & Budget', 'Your Interests']
+const STEPS = ['Where & When', 'Travellers & Budget', 'Your Interests']
 
 export default function Plan() {
-  const [searchParams]  = useSearchParams()
-  const navigate         = useNavigate()
-  const [step, setStep]  = useState(0)
+  const [searchParams] = useSearchParams()
+  const navigate        = useNavigate()
+  const [step, setStep] = useState(0)
 
   const [form, setForm] = useState({
     destination: searchParams.get('destination') || '',
     startDate:   '',
     endDate:     '',
     travellers:  1,
-    tripType:    '',
     budget:      '',
     interests:   [],
   })
@@ -62,12 +54,14 @@ export default function Plan() {
 
   const canProceed =
     step === 0 ? form.destination.trim() && form.startDate && form.endDate :
-    step === 1 ? form.tripType && form.budget :
+    step === 1 ? form.budget :
     step === 2 ? form.interests.length > 0 : false
 
   const days =
     form.startDate && form.endDate
-      ? Math.max(1, Math.round((new Date(form.endDate) - new Date(form.startDate)) / 86400000))
+      ? Math.max(1, Math.round(
+          (new Date(form.endDate) - new Date(form.startDate)) / 86400000
+        ))
       : 0
 
   const handleGenerate = () => {
@@ -77,7 +71,7 @@ export default function Plan() {
   return (
     <div className="min-h-screen bg-[#FAFAF8] pt-20">
 
-      {/* ── Dark header with steps ── */}
+      {/* ── Dark header ── */}
       <div className="bg-[#2C1810] pt-12 pb-20 px-6 text-center">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <p className="text-[#E8A87C] text-xs tracking-[0.3em] uppercase mb-3">
@@ -95,9 +89,9 @@ export default function Plan() {
               <div key={s} className="flex items-center gap-3">
                 <div className="flex flex-col items-center gap-1.5">
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-                    i < step  ? 'bg-[#C4663A] text-white'    :
-                    i === step ? 'bg-white text-[#2C1810]'   :
-                                  'bg-white/20 text-white/40'
+                    i < step   ? 'bg-[#C4663A] text-white'  :
+                    i === step ? 'bg-white text-[#2C1810]'  :
+                                 'bg-white/20 text-white/40'
                   }`}>
                     {i < step ? <Check size={13} /> : i + 1}
                   </div>
@@ -175,7 +169,7 @@ export default function Plan() {
             </div>
           )}
 
-          {/* ── Step 1: Who & Budget ── */}
+          {/* ── Step 1: Travellers & Budget ── */}
           {step === 1 && (
             <div className="space-y-7">
 
@@ -197,28 +191,9 @@ export default function Plan() {
                     className="w-10 h-10 rounded-full border-2 border-[#F0E6DC] text-[#C4663A] font-bold text-xl hover:border-[#C4663A] transition-colors flex items-center justify-center"
                   >+</button>
                 </div>
-              </div>
-
-              {/* Trip type */}
-              <div>
-                <label className="block text-[#2C1810] font-semibold mb-3 text-sm">Trip Type</label>
-                <div className="grid grid-cols-2 gap-3">
-                  {tripTypes.map((t) => (
-                    <button
-                      key={t.id}
-                      onClick={() => update('tripType', t.id)}
-                      className={`p-4 rounded-2xl border-2 text-left transition-all ${
-                        form.tripType === t.id
-                          ? 'border-[#C4663A] bg-[#FFF0E6]'
-                          : 'border-[#F0E6DC] hover:border-[#E8D5C4]'
-                      }`}
-                    >
-                      <div className="text-2xl mb-1">{t.emoji}</div>
-                      <div className="font-semibold text-[#2C1810] text-sm">{t.label}</div>
-                      <div className="text-[#8B5E3C] text-xs">{t.desc}</div>
-                    </button>
-                  ))}
-                </div>
+                <p className="text-[#8B5E3C] text-xs mt-2">
+                  All costs will be shown per person and as grand total for {form.travellers} {form.travellers === 1 ? 'person' : 'people'}.
+                </p>
               </div>
 
               {/* Budget */}
@@ -278,7 +253,7 @@ export default function Plan() {
             </div>
           )}
 
-          {/* ── Navigation buttons ── */}
+          {/* ── Navigation ── */}
           <div className="flex justify-between mt-8 pt-6 border-t border-[#F0E6DC]">
             {step > 0 ? (
               <button
