@@ -282,7 +282,7 @@ async def generate_itinerary_stream(request: Request, trip: TripRequest):
             llm   = ChatGroq(
                 model="llama-3.1-8b-instant",
                 temperature=0.7,
-                max_tokens=4096,
+                max_tokens=2048,
                 api_key=os.getenv("GROQ_API_KEY"),
                 streaming=True,
             )

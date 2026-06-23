@@ -2,28 +2,29 @@ import { useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import {
-  MapPin, Calendar, ArrowRight,
-  ArrowLeft, Check
+  MapPin, Calendar, ArrowRight, ArrowLeft, Check,
+  Landmark, UtensilsCrossed, Mountain, Leaf, Waves,
+  Sun, ShoppingBag, Camera, Music, Heart, Sparkles
 } from 'lucide-react'
 
 const budgets = [
-  { id: 'budget',  label: 'Budget',    range: '₹800 – ₹1,800/day',   desc: 'Hostels, street food, buses'      },
-  { id: 'mid',     label: 'Mid-Range', range: '₹1,800 – ₹4,500/day', desc: 'Hotels, restaurants, trains'      },
-  { id: 'premium', label: 'Premium',   range: '₹4,500 – ₹10,000/day',desc: 'Resorts, fine dining, flights'    },
-  { id: 'luxury',  label: 'Luxury',    range: '₹10,000+/day',         desc: 'Heritage hotels, private tours'   },
+  { id: 'budget',  label: 'Budget',    range: '₹800 – ₹1,800/day',    desc: 'Hostels, street food, buses'    },
+  { id: 'mid',     label: 'Mid-Range', range: '₹1,800 – ₹4,500/day',  desc: 'Hotels, restaurants, trains'    },
+  { id: 'premium', label: 'Premium',   range: '₹4,500 – ₹10,000/day', desc: 'Resorts, fine dining, flights'  },
+  { id: 'luxury',  label: 'Luxury',    range: '₹10,000+/day',          desc: 'Heritage hotels, private tours' },
 ]
 
 const interests = [
-  { id: 'culture',     label: 'Culture & Heritage',   emoji: '🏛️' },
-  { id: 'food',        label: 'Food & Street Food',   emoji: '🍛' },
-  { id: 'adventure',   label: 'Adventure & Trekking', emoji: '🏔️' },
-  { id: 'nature',      label: 'Nature & Wildlife',    emoji: '🌿' },
-  { id: 'beaches',     label: 'Beaches & Water',      emoji: '🏖️' },
-  { id: 'spiritual',   label: 'Temples & Spiritual',  emoji: '🙏' },
-  { id: 'shopping',    label: 'Markets & Shopping',   emoji: '🛍️' },
-  { id: 'photography', label: 'Photography',          emoji: '📸' },
-  { id: 'nightlife',   label: 'Nightlife & Music',    emoji: '🎵' },
-  { id: 'wellness',    label: 'Yoga & Wellness',      emoji: '🧘' },
+  { id: 'culture',     label: 'Culture & Heritage',   Icon: Landmark        },
+  { id: 'food',        label: 'Food & Street Food',   Icon: UtensilsCrossed },
+  { id: 'adventure',   label: 'Adventure & Trekking', Icon: Mountain        },
+  { id: 'nature',      label: 'Nature & Wildlife',    Icon: Leaf            },
+  { id: 'beaches',     label: 'Beaches & Water',      Icon: Waves           },
+  { id: 'spiritual',   label: 'Temples & Spiritual',  Icon: Sun             },
+  { id: 'shopping',    label: 'Markets & Shopping',   Icon: ShoppingBag     },
+  { id: 'photography', label: 'Photography',          Icon: Camera          },
+  { id: 'nightlife',   label: 'Nightlife & Music',    Icon: Music           },
+  { id: 'wellness',    label: 'Yoga & Wellness',      Icon: Heart           },
 ]
 
 const STEPS = ['Where & When', 'Travellers & Budget', 'Your Interests']
@@ -71,7 +72,7 @@ export default function Plan() {
   return (
     <div className="min-h-screen bg-[#FAFAF8] pt-20">
 
-      {/* ── Dark header ── */}
+      {/* Dark header */}
       <div className="bg-[#2C1810] pt-12 pb-20 px-6 text-center">
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
           <p className="text-[#E8A87C] text-xs tracking-[0.3em] uppercase mb-3">
@@ -108,7 +109,7 @@ export default function Plan() {
         </motion.div>
       </div>
 
-      {/* ── Form card ── */}
+      {/* Form card */}
       <div className="max-w-2xl mx-auto px-6 -mt-10 pb-16">
         <motion.div
           key={step}
@@ -118,7 +119,7 @@ export default function Plan() {
           className="bg-white rounded-3xl shadow-xl border border-[#F0E6DC] p-8"
         >
 
-          {/* ── Step 0: Where & When ── */}
+          {/* Step 0: Where & When */}
           {step === 0 && (
             <div className="space-y-6">
               <div>
@@ -169,11 +170,9 @@ export default function Plan() {
             </div>
           )}
 
-          {/* ── Step 1: Travellers & Budget ── */}
+          {/* Step 1: Travellers & Budget */}
           {step === 1 && (
             <div className="space-y-7">
-
-              {/* Traveller count */}
               <div>
                 <label className="block text-[#2C1810] font-semibold mb-3 text-sm">
                   Number of Travellers
@@ -192,11 +191,10 @@ export default function Plan() {
                   >+</button>
                 </div>
                 <p className="text-[#8B5E3C] text-xs mt-2">
-                  All costs will be shown per person and as grand total for {form.travellers} {form.travellers === 1 ? 'person' : 'people'}.
+                  Costs shown per person and as total for {form.travellers} {form.travellers === 1 ? 'person' : 'people'}.
                 </p>
               </div>
 
-              {/* Budget */}
               <div>
                 <label className="block text-[#2C1810] font-semibold mb-3 text-sm">Budget Range</label>
                 <div className="space-y-2.5">
@@ -224,28 +222,31 @@ export default function Plan() {
             </div>
           )}
 
-          {/* ── Step 2: Interests ── */}
+          {/* Step 2: Interests */}
           {step === 2 && (
             <div>
               <p className="text-[#8B5E3C] text-sm mb-5">
                 Pick everything that excites you — select as many as you like
               </p>
               <div className="grid grid-cols-2 gap-3">
-                {interests.map((item) => (
+                {interests.map(({ id, label, Icon }) => (
                   <button
-                    key={item.id}
-                    onClick={() => toggleInterest(item.id)}
+                    key={id}
+                    onClick={() => toggleInterest(id)}
                     className={`p-3.5 rounded-2xl border-2 flex items-center gap-3 transition-all ${
-                      form.interests.includes(item.id)
+                      form.interests.includes(id)
                         ? 'border-[#C4663A] bg-[#FFF0E6]'
                         : 'border-[#F0E6DC] hover:border-[#E8D5C4]'
                     }`}
                   >
-                    <span className="text-xl">{item.emoji}</span>
+                    <Icon
+                      size={16}
+                      className={form.interests.includes(id) ? 'text-[#C4663A]' : 'text-[#8B5E3C]'}
+                    />
                     <span className={`text-xs font-semibold text-left leading-tight ${
-                      form.interests.includes(item.id) ? 'text-[#C4663A]' : 'text-[#3D2314]'
+                      form.interests.includes(id) ? 'text-[#C4663A]' : 'text-[#3D2314]'
                     }`}>
-                      {item.label}
+                      {label}
                     </span>
                   </button>
                 ))}
@@ -253,7 +254,7 @@ export default function Plan() {
             </div>
           )}
 
-          {/* ── Navigation ── */}
+          {/* Navigation */}
           <div className="flex justify-between mt-8 pt-6 border-t border-[#F0E6DC]">
             {step > 0 ? (
               <button
@@ -274,8 +275,8 @@ export default function Plan() {
               }`}
             >
               {step < STEPS.length - 1
-                ? <> Next <ArrowRight size={15} /> </>
-                : <> ✨ Generate My Itinerary </>
+                ? <> Next <ArrowRight size={15} /></>
+                : <> <Sparkles size={15} /> Generate My Itinerary</>
               }
             </button>
           </div>

@@ -6,9 +6,12 @@ import L from 'leaflet'
 import {
   MapPin, Calendar, Users, Wallet, Sun, Sunset, Moon,
   Train, Utensils, BedDouble, Package, Phone,
-  ChevronLeft, ChevronRight, AlertCircle, Loader2
+  ChevronLeft, ChevronRight, AlertCircle, Loader2,
+  Bookmark, Share2, Printer, RefreshCw, Lightbulb,
+  Star, Sparkles, Tag, Clock, ShoppingBag
 } from 'lucide-react'
-import { generateItineraryStream, clearItineraryCache } from '../api/client'
+import { generateItineraryStream, clearItineraryCache, saveTrip } from '../api/client'
+import toast from 'react-hot-toast'
 import { useUser } from '@clerk/clerk-react'
 import TripAssistant from '../components/TripAssistant'
 import TrainFinder from '../components/TrainFinder'
@@ -91,14 +94,11 @@ export default function Itinerary() {
     if (!user?.id) return
     setSaving(true)
     try {
-      const { saveTrip }       = await import('../api/client')
-      const { default: toast } = await import('react-hot-toast')
       await saveTrip(user.id, data.destination, form, data)
       setIsSaved(true)
       setShowSaveModal(false)
       toast.success('Trip saved!')
     } catch {
-      const { default: toast } = await import('react-hot-toast')
       toast.error('Could not save. Try again.')
     } finally {
       setSaving(false)
@@ -123,12 +123,64 @@ export default function Itinerary() {
       })
     } catch {}
 
-    generateItineraryStream(
-      form,
-      (chunk) => setRawText(t => t + chunk),
-      (final) => { setData(final); setLoading(false); setRegenerating(false) },
-      (err)   => { setError(String(err)); setLoading(false); setRegenerating(false) }
-    )
+    const generateItineraryStream = (formData, onChunk, onComplete, onError) => {
+      const days = Math.max(1, Math.round(
+        (new Date(formData.endDate) - new Date(formData.startDate)) / 86400000
+      ))
+
+      const baseURL = import.meta.env.VITE_API_URL !== undefined && import.meta.env.VITE_API_URL !== ''
+        ? import.meta.env.VITE_API_URL
+        : import.meta.env.DEV
+          ? 'http://localhost:8000'
+          : ''
+
+      const attempt = (retryCount = 0) => {
+        fetch(`${baseURL}/api/generate-itinerary-stream`, {
+          method:  'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body:    JSON.stringify({ ...formData, days }),
+        })
+          .then(async (res) => {
+            if (res.status === 429) {
+              if (retryCount < 2) {
+                // wait 10 seconds then retry
+                setTimeout(() => attempt(retryCount + 1), 10000)
+                onChunk('\n[Rate limit hit — retrying in 10 seconds...]')
+                return
+              } else {
+                onError('Rate limit exceeded. Please wait a minute and try again.')
+                return
+              }
+            }
+
+            const reader  = res.body.getReader()
+            const decoder = new TextDecoder()
+
+            while (true) {
+              const { done, value } = await reader.read()
+              if (done) break
+
+              const text  = decoder.decode(value)
+              const lines = text.split('\n').filter(l => l.startsWith('data: '))
+
+              for (const line of lines) {
+                const raw = line.replace('data: ', '').trim()
+                if (raw === '[DONE]') continue
+
+                try {
+                  const parsed = JSON.parse(raw)
+                  if (parsed.error)  { onError(parsed.error); return }
+                  if (parsed.final)  { onComplete(parsed.final); return }
+                  if (parsed.chunk)  { onChunk(parsed.chunk) }
+                } catch {}
+              }
+            }
+          })
+          .catch(onError)
+      }
+
+      attempt()
+    }
   }
 
   // Geocode for map
@@ -206,32 +258,31 @@ export default function Itinerary() {
               >
                 {regenerating
                   ? <><Loader2 size={14} className="animate-spin" /> Regenerating...</>
-                  : <>↺ Regenerate</>
+                  : <><RefreshCw size={14} /> Regenerate</>
                 }
               </button>
 
               {/* Share */}
               <button
                 onClick={async () => {
-                  const text = `Check out my ${data?.days}-day trip to ${data?.destination} planned with Raahi! 🇮🇳`
+                  const text = `Check out my ${data?.days}-day trip to ${data?.destination} planned with Raahi!`
                   if (navigator.share) {
                     try { await navigator.share({ title: `Raahi — ${data?.destination}`, text, url: window.location.href }) }
                     catch {}
                   } else {
                     navigator.clipboard.writeText(text)
-                    const { default: toast } = await import('react-hot-toast')
                     toast.success('Copied to clipboard!')
                   }
                 }}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold bg-white/15 hover:bg-white/25 text-white border border-white/25 transition-all"
               >
-                🔗 Share
+                <Share2 size={14} /> Share
               </button>
 
               {/* Print */}
               <button onClick={() => window.print()}
                 className="flex items-center gap-1.5 px-4 py-2 rounded-full text-sm font-semibold bg-white/15 hover:bg-white/25 text-white border border-white/25 transition-all">
-                🖨️ Print
+                <Printer size={14} /> Print
               </button>
 
               {/* Save */}
@@ -244,7 +295,7 @@ export default function Itinerary() {
                     : 'bg-[#C4663A] hover:bg-[#A85530] text-white'
                 }`}
               >
-                {isSaved ? '✓ Saved' : '🔖 Save'}
+                {isSaved ? <><Bookmark size={14} className="fill-green-400" /> Saved</> : <><Bookmark size={14} /> Save</>}
               </button>
             </div>
           </div>
@@ -265,7 +316,7 @@ export default function Itinerary() {
           <div className="flex flex-wrap gap-3 mb-4">
             {[
               { icon: Calendar, label: `${data.days} Days`,                                                           sub: `${form.startDate} → ${form.endDate}` },
-              { icon: Users,    label: `${form.travellers} People`,                                                   sub: form.tripType },
+              { icon: Users, label: `${form.travellers} ${form.travellers === 1 ? 'Person' : 'People'}`, sub: `${form.budget} budget` },
               { icon: Wallet,   label: `₹${data.budget_breakdown?.total_per_person?.toLocaleString('en-IN')}/person`, sub: 'estimated total' },
             ].map(({ icon: Icon, label, sub }) => (
               <div key={label} className="flex items-center gap-2 bg-white/10 rounded-xl px-4 py-2.5">
@@ -282,8 +333,8 @@ export default function Itinerary() {
           {data.highlights?.length > 0 && (
             <div className="flex flex-wrap gap-2">
               {data.highlights.map(h => (
-                <span key={h} className="px-3 py-1 bg-[#C4663A]/25 text-[#E8A87C] text-xs rounded-full border border-[#C4663A]/30">
-                  ✦ {h}
+                <span key={h} className="flex items-center px-3 py-1 bg-[#C4663A]/25 text-[#E8A87C] text-xs rounded-full border border-[#C4663A]/30">
+                  <Star size={9} className="fill-[#E8A87C] text-[#E8A87C] mr-1.5" /> {h}
                 </span>
               ))}
             </div>
@@ -355,15 +406,17 @@ export default function Itinerary() {
                         <p className="text-[#8B5E3C] text-sm leading-relaxed mb-3">{block.description}</p>
                         <div className="flex items-center justify-between flex-wrap gap-2">
                           <span className="text-xs text-[#8B5E3C] bg-[#F0E6DC] px-3 py-1 rounded-full">
-                            ⏱ {block.duration}
+                            <Clock size={11} className="inline mr-1" />{block.duration}
                           </span>
                           <span className="text-xs font-semibold text-[#3D2314]">
-                            {block.cost_inr === 0 ? '🆓 Free' : `₹${block.cost_inr}`}
+                            {block.cost_inr === 0
+                            ? <span className="flex items-center gap-1 text-green-600"><Tag size={11} /> Free</span>
+                            : `₹${block.cost_inr}`}
                           </span>
                         </div>
                         {block.tip && (
                           <div className="mt-3 bg-[#FFF8F0] border border-[#F0E6DC] rounded-xl px-3 py-2 text-xs text-[#8B5E3C]">
-                            💡 {block.tip}
+                            <Lightbulb size={12} className="text-[#C4663A] inline mr-1.5" /> {block.tip}
                           </div>
                         )}
                       </div>
@@ -378,9 +431,16 @@ export default function Itinerary() {
                       <span className="font-bold text-[#2C1810] text-sm">What to Eat Today</span>
                     </div>
                     <div className="space-y-2.5">
-                      {[['☀️ Breakfast', day.meals.breakfast], ['🌤 Lunch', day.meals.lunch], ['🌙 Dinner', day.meals.dinner]].map(([label, val]) => (
-                        <div key={label} className="flex gap-3">
-                          <span className="text-[#8B5E3C] w-24 shrink-0 text-xs font-semibold">{label}</span>
+                      {[
+                        ['Breakfast', Sun,    day.meals.breakfast],
+                        ['Lunch',     Sunset, day.meals.lunch    ],
+                        ['Dinner',    Moon,   day.meals.dinner   ],
+                      ].map(([label, Icon, val]) => (
+                        <div key={label} className="flex gap-3 items-start">
+                          <div className="flex items-center gap-1 text-[#8B5E3C] w-24 shrink-0">
+                            <Icon size={11} />
+                            <span className="text-xs font-semibold">{label}</span>
+                          </div>
                           <span className="text-[#3D2314] text-xs leading-relaxed">{val}</span>
                         </div>
                       ))}
@@ -396,12 +456,15 @@ export default function Itinerary() {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                       {[
-                        ['Budget 🪙',    day.stay.budget_option,  '#10B981'],
-                        ['Mid-Range ⭐', day.stay.mid_option,     '#F59E0B'],
-                        ['Premium 💎',   day.stay.premium_option, '#8B5CF6'],
-                      ].map(([label, val, color]) => (
+                        { label: 'Budget',    val: day.stay.budget_option,  color: '#10B981', Icon: Wallet     },
+                        { label: 'Mid-Range', val: day.stay.mid_option,     color: '#F59E0B', Icon: Star       },
+                        { label: 'Premium',   val: day.stay.premium_option, color: '#8B5CF6', Icon: Sparkles   },
+                      ].map(({ label, val, color, Icon }) => (
                         <div key={label} className="bg-[#FAFAF8] rounded-xl p-3 border border-[#F0E6DC]">
-                          <div className="text-xs font-bold mb-1" style={{ color }}>{label}</div>
+                          <div className="flex items-center gap-1.5 mb-1.5">
+                            <Icon size={11} style={{ color }} />
+                            <span className="text-xs font-bold" style={{ color }}>{label}</span>
+                          </div>
                           <div className="text-xs text-[#3D2314] leading-relaxed">{val}</div>
                         </div>
                       ))}
@@ -432,23 +495,32 @@ export default function Itinerary() {
             <div className="bg-white rounded-3xl p-6 border border-[#F0E6DC] shadow-sm mb-4">
               <h2 className="font-bold text-[#2C1810] mb-5 text-lg">Budget Breakdown</h2>
               {[
-                ['🏨 Accommodation',   data.budget_breakdown.accommodation  ],
-                ['🍛 Food & Drinks',   data.budget_breakdown.food           ],
-                ['🚌 Local Transport', data.budget_breakdown.local_transport ],
-                ['🎫 Sightseeing',     data.budget_breakdown.sightseeing    ],
-                ['🛍️ Shopping & Misc', data.budget_breakdown.shopping_misc  ],
-              ].map(([label, amount]) => {
-                const pct = Math.round((amount / data.budget_breakdown.total_per_person) * 100)
+                { label: 'Accommodation',   key: 'accommodation',   Icon: BedDouble     },
+                { label: 'Food & Drinks',   key: 'food',            Icon: Utensils      },
+                { label: 'Local Transport', key: 'local_transport', Icon: Train         },
+                { label: 'Sightseeing',     key: 'sightseeing',     Icon: MapPin        },
+                { label: 'Shopping & Misc', key: 'shopping_misc',   Icon: ShoppingBag   },
+              ].map(({ label, key, Icon }) => {
+                const amount = data.budget_breakdown[key]
+                const pct    = Math.round((amount / data.budget_breakdown.total_per_person) * 100)
                 return (
-                  <div key={label} className="mb-4">
+                  <div key={key} className="mb-4">
                     <div className="flex justify-between text-sm mb-1.5">
-                      <span className="text-[#3D2314] font-medium">{label}</span>
-                      <span className="text-[#8B5E3C] font-semibold">₹{amount?.toLocaleString('en-IN')}</span>
+                      <div className="flex items-center gap-2 text-[#3D2314] font-medium">
+                        <Icon size={13} className="text-[#C4663A]" />
+                        {label}
+                      </div>
+                      <span className="text-[#8B5E3C] font-semibold">
+                        ₹{amount?.toLocaleString('en-IN')}
+                      </span>
                     </div>
                     <div className="h-2 bg-[#F0E6DC] rounded-full overflow-hidden">
-                      <motion.div initial={{ width: 0 }} animate={{ width: `${pct}%` }}
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${pct}%` }}
                         transition={{ duration: 0.8, delay: 0.1 }}
-                        className="h-full bg-[#C4663A] rounded-full" />
+                        className="h-full bg-[#C4663A] rounded-full"
+                      />
                     </div>
                   </div>
                 )
@@ -492,7 +564,10 @@ export default function Itinerary() {
 
             {data.transport.useful_apps?.length > 0 && (
               <div className="bg-white rounded-2xl p-5 border border-[#F0E6DC] shadow-sm">
-                <div className="font-bold text-[#2C1810] text-sm mb-3">📱 Useful Apps</div>
+                <div className="flex items-center gap-2 mb-3">
+                  <Phone size={14} className="text-[#C4663A]" />
+                  <span className="font-bold text-[#2C1810] text-sm">Useful Apps</span>
+                </div>
                 <div className="flex flex-wrap gap-2">
                   {data.transport.useful_apps.map(app => (
                     <span key={app} className="px-3 py-1.5 bg-[#FFF0E6] text-[#C4663A] text-xs font-semibold rounded-full">
@@ -548,7 +623,7 @@ export default function Itinerary() {
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
             <div className="bg-white rounded-2xl p-5 border border-[#F0E6DC] shadow-sm mb-4">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-lg">🌤️</span>
+                <Sun size={15} className="text-[#C4663A]" />
                 <span className="font-bold text-[#2C1810] text-sm">Best Time Note</span>
               </div>
               <p className="text-[#8B5E3C] text-sm leading-relaxed">{data.best_time_note}</p>
