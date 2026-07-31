@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from mangum import Mangum
 from dotenv import load_dotenv
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List
 from motor.motor_asyncio import AsyncIOMotorClient
 from slowapi import Limiter, _rate_limit_exceeded_handler
@@ -45,7 +45,6 @@ def get_db():
             _mongo_client = AsyncIOMotorClient(
                 uri,
                 tlsCAFile=certifi.where(),
-                tlsInsecure=True,
                 serverSelectionTimeoutMS=5000,
             )
             _db = _mongo_client.raahi
@@ -212,11 +211,11 @@ class TripRequest(BaseModel):
     destination: str
     startDate:   str
     endDate:     str
-    travellers:  int
-    tripType:    str=""
+    travellers:  int = Field(ge=1, le=20)
+    tripType:    str = ""
     budget:      str
     interests:   List[str]
-    days:        int
+    days:        int = Field(ge=1, le=30)
 
 class SaveTripRequest(BaseModel):
     user_id:     str
@@ -239,6 +238,29 @@ class TrainRequest(BaseModel):
 # ══════════════════════════════════════
 # ROUTES
 # ══════════════════════════════════════
+
+def parse_llm_json(raw: str) -> dict:
+    """
+    Groq/Llama sometimes wraps its JSON reply in ```json fences, or adds
+    stray text before/after the object. This cleans that up, then falls
+    back to json_repair if the JSON is still slightly broken.
+    """
+    raw = raw.strip()
+    if raw.startswith("```"):
+        raw = raw.split("```")[1]
+        if raw.startswith("json"):
+            raw = raw[4:]
+    raw = raw.strip()
+
+    start, end = raw.find("{"), raw.rfind("}")
+    if start != -1 and end != -1:
+        raw = raw[start:end + 1]
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        from json_repair import repair_json
+        return json.loads(repair_json(raw))
 
 @app.get("/api/health")
 async def health():
@@ -304,19 +326,7 @@ async def generate_itinerary_stream(request: Request, trip: TripRequest):
                     full_response += text
                     yield f"data: {json.dumps({'chunk': text})}\n\n"
 
-            raw = full_response.strip()
-            if raw.startswith("```"):
-                raw = raw.split("```")[1]
-                if raw.startswith("json"): raw = raw[4:]
-            raw   = raw.strip()
-            start = raw.find("{"); end = raw.rfind("}")
-            if start != -1 and end != -1: raw = raw[start:end+1]
-
-            try:
-                result = json.loads(raw)
-            except json.JSONDecodeError:
-                from json_repair import repair_json
-                result = json.loads(repair_json(raw))
+            result = parse_llm_json(full_response)
             
             # Force correct grand_total regardless of what AI calculated
             if 'budget_breakdown' in result:
@@ -384,15 +394,7 @@ async def generate_itinerary(request: Request, trip: TripRequest):
             "interests":   ", ".join(trip.interests),
         })
 
-        raw   = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"): raw = raw[4:]
-        raw   = raw.strip()
-        start = raw.find("{"); end = raw.rfind("}")
-        if start != -1 and end != -1: raw = raw[start:end+1]
-
-        result = json.loads(raw)
+        result = parse_llm_json(raw)
 
         # Force correct grand_total regardless of what AI calculated
         if 'budget_breakdown' in result:
@@ -545,15 +547,7 @@ async def find_trains(request: Request, data: TrainRequest):
             "destination": data.destination,
         })
 
-        raw   = raw.strip()
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"): raw = raw[4:]
-        raw   = raw.strip()
-        start = raw.find("{"); end = raw.rfind("}")
-        if start != -1 and end != -1: raw = raw[start:end+1]
-
-        result = json.loads(raw)
+        result = parse_llm_json(raw)
 
         if redis:
             try:
