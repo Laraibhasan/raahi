@@ -302,7 +302,7 @@ async def generate_itinerary_stream(request: Request, trip: TripRequest):
             from langchain_core.prompts import ChatPromptTemplate
 
             llm   = ChatGroq(
-                model="openai/gpt-oss-120b",
+                model="llama-3.3-70b-versatile",
                 temperature=0.7,
                 max_tokens=2048,
                 api_key=os.getenv("GROQ_API_KEY"),
@@ -377,7 +377,7 @@ async def generate_itinerary(request: Request, trip: TripRequest):
         from langchain_core.output_parsers import StrOutputParser
 
         llm   = ChatGroq(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             temperature=0.7,
             max_tokens=4096,
             api_key=os.getenv("GROQ_API_KEY"),
@@ -496,7 +496,7 @@ Rules:
 - Never make up information — if unsure, say so"""
 
         llm  = ChatGroq(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             temperature=0.7,
             max_tokens=400,
             api_key=os.getenv("GROQ_API_KEY"),
@@ -536,7 +536,7 @@ async def find_trains(request: Request, data: TrainRequest):
         from langchain_core.output_parsers import StrOutputParser
 
         llm   = ChatGroq(
-            model="llama-3.1-8b-instant",
+            model="llama-3.3-70b-versatile",
             temperature=0.3,
             max_tokens=2000,
             api_key=os.getenv("GROQ_API_KEY"),
