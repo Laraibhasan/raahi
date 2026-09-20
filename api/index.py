@@ -302,7 +302,7 @@ async def generate_itinerary_stream(request: Request, trip: TripRequest):
             from langchain_core.prompts import ChatPromptTemplate
 
             llm   = ChatGroq(
-                model="openai/gpt-oss-20b",
+                model="qwen/qwen3.8-27b",
                 temperature=0.7,
                 max_tokens=2048,
                 api_key=os.getenv("GROQ_API_KEY"),
