@@ -498,7 +498,7 @@ Rules:
         llm  = ChatGroq(
             model="openai/gpt-oss-20b",
             temperature=0.7,
-            max_tokens=400,
+            max_tokens=4096,
             api_key=os.getenv("GROQ_API_KEY"),
         )
         msgs = [SystemMessage(content=system)]
@@ -538,7 +538,7 @@ async def find_trains(request: Request, data: TrainRequest):
         llm   = ChatGroq(
             model="openai/gpt-oss-20b",
             temperature=0.3,
-            max_tokens=2000,
+            max_tokens=8192,
             api_key=os.getenv("GROQ_API_KEY"),
         )
         chain = ChatPromptTemplate.from_template(TRAIN_PROMPT) | llm | StrOutputParser()
