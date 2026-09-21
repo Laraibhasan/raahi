@@ -498,7 +498,7 @@ Rules:
         llm  = ChatGroq(
             model="openai/gpt-oss-20b",
             temperature=0.7,
-            max_tokens=4096,
+            max_tokens=8192,
             api_key=os.getenv("GROQ_API_KEY"),
         )
         msgs = [SystemMessage(content=system)]
